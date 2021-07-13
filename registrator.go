@@ -5,16 +5,16 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"runtime"
 	"strings"
 	"time"
-	"net"
 
+	"github.com/docker/docker/api/types/swarm"
 	dockerapi "github.com/fsouza/go-dockerclient"
 	"github.com/gliderlabs/pkg/usage"
 	"github.com/gliderlabs/registrator/bridge"
-	"github.com/docker/docker/api/types/swarm"
 )
 
 var Version string
@@ -81,13 +81,13 @@ func main() {
 
 		// maybe -ip option references an interface name
 		if addr == nil {
-				ip := ipAddressForInterfaceName(*hostIp)
-				if ip != "" {
-						*hostIp = ip
-				} else {
-					log.Printf("Ignoring option -ip=%s as it references no valid ip address or interface name", *hostIp)
-					*hostIp = ""
-				}
+			ip := ipAddressForInterfaceName(*hostIp)
+			if ip != "" {
+				*hostIp = ip
+			} else {
+				log.Printf("Ignoring option -ip=%s as it references no valid ip address or interface name", *hostIp)
+				*hostIp = ""
+			}
 		}
 	}
 
@@ -220,51 +220,64 @@ func main() {
 	// Process Docker events
 	for msg := range events {
 		switch msg.Type {
-			case "container": {
+		case "container":
+			{
 				switch msg.Action {
-					case "start": {
+				case "start":
+					{
 						log.Printf("event: container %s started", msg.Actor.ID)
 						go b.Add(msg.Actor.ID)
 					}
-					case "die": {
+				case "die":
+					{
 						log.Printf("event: container %s died", msg.Actor.ID)
 						go b.RemoveOnExit(msg.Actor.ID)
 					}
-					case "stop": {
+				case "stop":
+					{
 						log.Printf("event: container %s stopped", msg.Actor.ID)
 						go b.RemoveOnExit(msg.Actor.ID)
 					}
-					case "kill": {
+				case "kill":
+					{
 						log.Printf("event: container %s killed", msg.Actor.ID)
 						go b.RemoveOnExit(msg.Actor.ID)
 					}
-					default: {
+				default:
+					{
 						log.Printf("event: %s %s %s", msg.Type, msg.Action, msg.Actor.ID)
 					}
 				}
 			}
-			case "service": {
+		case "service":
+			{
 				switch msg.Action {
-					case "create": {
+				case "create":
+					{
 						log.Printf("event: swarm service %s created", msg.Actor.ID)
 						go b.RegisterSwarmServiceById(msg.Actor.ID)
 					}
-					case "update": {
+				case "update":
+					{
 						log.Printf("event: swarm service %s updated", msg.Actor.ID)
 						go b.UpdateSwarmServiceById(msg.Actor.ID)
 					}
-					case "remove": {
+				case "remove":
+					{
 						log.Printf("event: swarm service %s removed", msg.Actor.ID)
 						go b.DeregisterSwarmServiceById(msg.Actor.ID)
 					}
-					default: {
+				default:
+					{
 						log.Printf("event: %s %s %s", msg.Type, msg.Action, msg.Actor.ID)
 					}
 				}
 			}
-			case "node": {
+		case "node":
+			{
 				switch msg.Action {
-					default: {
+				default:
+					{
 						log.Printf("event: %s %s %s", msg.Type, msg.Action, msg.Actor.ID)
 						go b.SyncSwarmServices()
 					}
@@ -296,15 +309,15 @@ func ipAddressForInterfaceName(name string) string {
 	for _, a := range addrs {
 		switch v := a.(type) {
 		case *net.IPNet:
-				if v.IP.To4() != nil {
-					return v.IP.String()
-				}
+			if v.IP.To4() != nil {
+				return v.IP.String()
+			}
 		case *net.IPAddr:
 			if v.IP.To4() != nil {
 				return v.IP.String()
 			}
 		default:
-				continue
+			continue
 		}
 	}
 
